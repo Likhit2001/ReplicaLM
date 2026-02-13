@@ -1,84 +1,9 @@
-from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import math
-
-@dataclass
-class GPTConfig:
-    block_size: int = 1024 # context length
-    vocab_size: int = 50257
-    n_layer: int = 12
-    n_head: int = 12
-    n_embed: int = 768
-
-class CasualSelfAttention(nn.Module):
-    def __init__(self,config):
-        super().__init__()
-        
-        self.c_attn = nn.Linear(config.n_embed, config.n_embed * 3)
-        self.c_proj = nn.Linear(config.n_embed, config.n_embed)
-        
-        self.n_head = config.n_head
-        self.n_embed = config.n_embed
-        
-        self.register_buffer("bias", torch.tril(torch.ones(config.block_size,config.block_size)).view(1, 1, config.block_size, config.block_size))
-        
-    def forward(self,x):
-        B, T, C = x.size() # Batch, Seq_len , n_embed
-        
-        qkv = self.c_attn(x) # Batch, Seq_len , 3*n_embed
-        q, k, v = qkv.split(self.n_embed, dim=-1)
-        
-        # change q k v to the multi head attention things
-        
-        k = k.view(B, T, self.n_head, C // self.n_head).transpose(1,2)
-        q = q.view(B, T, self.n_head, C // self.n_head).transpose(1,2)
-        v = v.view(B, T, self.n_head, C // self.n_head).transpose(1,2)
-        
-        
-        att_score = (q @ k.transpose(-2,-1)) * (1.0 / math.sqrt(k.size(-1)))
-        
-        att_score = att_score.masked_fill(self.bias[:,:,:T,:T] == 0 , float('-inf') )
-        
-        att = F.softmax(att_score,dim=-1)
-        y = att @ v 
-        
-        # the above y is in form my B, nh, T, dim
-        
-        y = y.transpose(1,2).contiguous().view(B,T,C)
-        y = self.c_proj(y)
-        return y
-        
-        
-class MLP(nn.Module):
-    def __init__(self,config):
-        super().__init__()
-        self.c_fc = nn.Linear(config.n_embed, config.n_embed * 4)
-        self.gelu = nn.GELU(approximate='tanh')
-        self.c_proj = nn.Linear(config.n_embed*4, config.n_embed)
-    
-    def forward(self,x):
-        x = self.c_fc(x)
-        x = self.gelu(x)
-        x = self.c_proj(x)
-        return x
-   
-
-class Block(nn.Module):
-    def __init__(self,config):
-        super().__init__()
-        
-        self.ln_1 = nn.LayerNorm(config.n_embed)
-        self.attn = CasualSelfAttention(config)
-        self.ln_2 = nn.LayerNorm(config.n_embed)
-        self.mlp = MLP(config)
-    
-    def forward(self, x):
-        x = x + self.attn(self.ln_1(x))
-        x = x + self.mlp(self.ln_2(x))
-        return x
-
+from .model_sublayer import Block
+from .config import GPTConfig
 
 # the structure of GPT 
 class GPT(nn.Module):
@@ -99,7 +24,7 @@ class GPT(nn.Module):
         
         self.lm_head = nn.Linear(config.n_embed, config.vocab_size, bias=False)
     
-    def forward(self,x):
+    def forward(self,x ,targets=None):
         
         B, T = x.size()
         assert T <= self.config.block_size, f"Cannot process sequence length of {T} > {self.config.block_size}"
@@ -115,7 +40,13 @@ class GPT(nn.Module):
         
         x = self.transformer.ln_f(x)
         logits = self.lm_head(x)
-        return logits
+        # print(logits.view(-1, logits.size(-1)).shape)
+        loss = 0
+        if targets is not None:
+            # print(f"{targets.view(-1).shape} this is called the target shapes")
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)),targets.view(-1))
+        
+        return logits , loss
         
     @classmethod
     def from_pretrained(cls, model_type):
@@ -166,42 +97,3 @@ class GPT(nn.Module):
                     sd[k].copy_(sd_hf[k])
 
         return model
-        
-
-
-#  ====================
-
-
-model = GPT.from_pretrained('gpt2')
-print("Model Weights has been loaded sucessfully")
-
-num_return_sentences = 5
-max_length = 30
-model.eval()
-
-import tiktoken
-enc = tiktoken.get_encoding('gpt2')
-tokens = enc.encode("Hello, I'm a language model, ")
-tokens = torch.tensor(tokens, dtype=torch.long)
-tokens = tokens.unsqueeze(0).repeat(num_return_sentences, 1) # 5 ,8
-x = tokens
-
-torch.manual_seed(42)
-while x.size(1) < max_length:
-    with torch.no_grad():
-        logits = model(x)
-        
-        logits = logits[:,-1,:]
-        probs = F.softmax(logits, dim=1) # (B, vocab_size)
-        
-        topk_probs , topk_indices = torch.topk(probs,50,dim= -1)
-        
-        ix = torch.multinomial(topk_probs,1)
-        
-        xcol = torch.gather(topk_indices, -1,ix)
-        x = torch.cat((x,xcol),dim=1)
-
-for i in range(num_return_sentences):
-    tokens = x[i,:max_length].tolist()
-    decode = enc.decode(tokens)
-    print(">", decode)
