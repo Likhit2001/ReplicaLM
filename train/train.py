@@ -6,10 +6,10 @@ import math
 import tiktoken
 from model_files.model_main import GPT
 from model_files.config import GPTConfig
+from data.data_loader import DataLoader
 
 
 # Device detection
-
 # ===
 device ="cpu"
 if torch.cuda.is_available():
@@ -19,41 +19,23 @@ elif torch.backends.mps.is_available():
 device ="cpu"
 print(f"Using the {device}")
 
-# Input data
-# === 
-
-from pathlib import Path 
-ROOT = Path(__file__).resolve().parents[1]   # ReplicaLM/
-filepath = ROOT / "data" / "input.txt"
-
-with open(filepath,'r') as f:
-    text = f.read()
-    
-data = text[:1000]
-
-import tiktoken
-
-enc = tiktoken.get_encoding('gpt2')
-tokens = enc.encode(text)
-B, T = 4 , 32
-buf = torch.tensor(tokens[:B*T + 1])
-x = buf[:-1].view(B,T)
-y = buf[1:].view(B,T)
-x = x.to(device)
-y = y.to(device)
+# Input data Loader
+training_data_loader = DataLoader(4,32)
 
 # Model intialization
-
 # model = GPT.from_pretrained('gpt2')
 model = GPT(GPTConfig())
 print("Model Weights has been loaded sucessfully")
 model.to(device)
-# logits , loss = model(x,y)
+
 optimiser = torch.optim.AdamW(model.parameters(), lr=3e-4)
 
-for i in range(100):
+for i in range(50):
     
     optimiser.zero_grad()
+    x , y = training_data_loader.next_batch()
+    x = x.to(device)
+    y = y.to(device)
     logits, loss = model(x,y)
     loss.backward()
     optimiser.step()

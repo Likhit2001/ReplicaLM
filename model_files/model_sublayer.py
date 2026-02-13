@@ -10,6 +10,8 @@ class CausalSelfAttention(nn.Module):
         self.c_attn = nn.Linear(config.n_embed, config.n_embed * 3)
         self.c_proj = nn.Linear(config.n_embed, config.n_embed)
         
+        self.c_proj.intial_scale = 1 # As the residual need a layer normalizations
+        
         self.n_head = config.n_head
         self.n_embed = config.n_embed
         
@@ -48,6 +50,7 @@ class MLP(nn.Module):
         self.c_fc = nn.Linear(config.n_embed, config.n_embed * 4)
         self.gelu = nn.GELU(approximate='tanh')
         self.c_proj = nn.Linear(config.n_embed*4, config.n_embed)
+        self.c_proj.intial_scale = 1
     
     def forward(self,x):
         x = self.c_fc(x)

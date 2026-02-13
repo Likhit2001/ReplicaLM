@@ -23,6 +23,22 @@ class GPT(nn.Module):
         ))
         
         self.lm_head = nn.Linear(config.n_embed, config.vocab_size, bias=False)
+        
+        #weight sharing scheme
+        self.transformer.wte.weights = self.lm_head.weight
+        
+        self.apply(self._init_weights)
+        
+    def _init_weights(self,module):
+        if isinstance(module,nn.Linear):
+            std = 0.02 
+            if hasattr(module,"intial_scale"):
+                std *= (2 * self.config.n_layer) ** -0.5
+            torch.nn.init.normal_(module.weight, mean=0.0 , std =0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module,nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std = 0.02)
     
     def forward(self,x ,targets=None):
         
