@@ -30,12 +30,13 @@ class CausalSelfAttention(nn.Module):
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1,2)
         
         
-        att_score = (q @ k.transpose(-2,-1)) * (1.0 / math.sqrt(k.size(-1)))
+        # att_score = (q @ k.transpose(-2,-1)) * (1.0 / math.sqrt(k.size(-1)))
+        # att_score = att_score.masked_fill(self.bias[:,:,:T,:T] == 0 , float('-inf') )
+        # att = F.softmax(att_score,dim=-1)
+        # y = att @ v 
         
-        att_score = att_score.masked_fill(self.bias[:,:,:T,:T] == 0 , float('-inf') )
-        
-        att = F.softmax(att_score,dim=-1)
-        y = att @ v 
+        # thee above 4 lines is removed to have the flash_attention layers
+        y = F.scaled_dot_product_attention(q,k,v)
         
         # the above y is in form my B, nh, T, dim
         
