@@ -54,8 +54,21 @@ def lr_schedular(it):
     
 
 # Optimizer
-optimiser = torch.optim.AdamW(model.parameters(), betas=(0.9,0.95), eps=1e-8)
+# optimiser = torch.optim.AdamW(model.parameters(), betas=(0.9,0.95), eps=1e-8)
 
+# Adding weight decay
+decay = []
+decay_not = []
+
+for name , param in model.named_parameters():
+    if param.ndim >= 2:
+        decay.append(param)
+    else:
+        decay_not.append(param)
+        
+modified_params_with_decay = [{"params" : decay , "weight_decay": 0.1}, {"params": decay_not, "weight_decay": 0.0}]
+
+optimiser = torch.optim.AdamW(modified_params_with_decay, lr=max_lr , betas=(0.9,0.95), eps=1e-8)
 
 # train loop
 for step in range(max_steps):
