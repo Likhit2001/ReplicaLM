@@ -42,3 +42,11 @@ trainenv/
 # *.pth
 # *.ckpt
 # checkpoints/
+
+# ignore generated dataset shards
+dataset/edu_fineweb10B_dataset/
+
+# or ignore all dataset binaries
+dataset/**/*.npy
+
+log/

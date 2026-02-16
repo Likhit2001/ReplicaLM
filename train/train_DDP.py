@@ -9,14 +9,14 @@ from model_files.config import GPTConfig
 from data.data_loader_DDP import DataLoader_DDP
 import time
 import os
-# torchrun --standalone --nproc_per_node=8 train_DDP.py
+
 # run the training loop
 from torch.distributed import init_process_group, destroy_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 
 
-ddp = int(os.environ.get('RANK', -1)) != -1 # is this a ddp run?
+ddp = int(os.environ.get('RANK', -1)) != -1 
 
 if ddp:
     # use of DDP atm demands CUDA, we set the device appropriately according to rank
