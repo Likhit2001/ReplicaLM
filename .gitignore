@@ -1,0 +1,52 @@
+# =========================
+# Python cache files
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# =========================
+# Virtual environments
+# =========================
+.venv/
+venv/
+env/
+ENV/
+trainenv/
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
+# Mac OS files
+# =========================
+.DS_Store
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Model checkpoints (optional)
+# Uncomment if needed
+# =========================
+# *.pt
+# *.pth
+# *.ckpt
+# checkpoints/
+
+# ignore generated dataset shards
+dataset/edu_fineweb10B_dataset/
+
+# or ignore all dataset binaries
+dataset/**/*.npy
+
+log/
