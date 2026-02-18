@@ -25,7 +25,7 @@ class GPT(nn.Module):
         self.lm_head = nn.Linear(config.n_embed, config.vocab_size, bias=False)
         
         #weight sharing scheme
-        self.transformer.wte.weights = self.lm_head.weight
+        self.transformer.wte.weight = self.lm_head.weight
         
         self.apply(self._init_weights)
         
@@ -34,7 +34,7 @@ class GPT(nn.Module):
             std = 0.02 
             if hasattr(module,"intial_scale"):
                 std *= (2 * self.config.n_layer) ** -0.5
-            torch.nn.init.normal_(module.weight, mean=0.0 , std =0.02)
+            torch.nn.init.normal_(module.weight, mean=0.0 , std = std)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module,nn.Embedding):

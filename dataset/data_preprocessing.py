@@ -6,7 +6,7 @@ from datasets import load_dataset
 from tqdm import tqdm 
 
 local_dir = "edu_fineweb10B_dataset"
-shard_size = int(1e7) # 10M tokens per shard, total of 100 shards
+shard_size = int(1e8) # 10M tokens per shard, total of 100 shards
 
 # create the cache the local directory if it doesn't exist yet
 DATA_CACHE_DIR = os.path.join(os.path.dirname(__file__), local_dir)

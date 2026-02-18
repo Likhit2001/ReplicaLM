@@ -1,6 +1,6 @@
 # parse_and_plot_log.py
 # Usage:
-#   python parse_and_plot_log.py --log log/log.txt --sz 124M --out plots/log_plot.png
+#   python -m final_test --log log/log.txt --sz 124M --out plots/log_plot.png
 #   python parse_and_plot_log.py --log log/log.txt --show
 
 import os

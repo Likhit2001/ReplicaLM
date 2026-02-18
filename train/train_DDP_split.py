@@ -10,6 +10,7 @@ from data.data_loader_DDP_split import DataLoader_DDP
 import time
 import os
 from test.heallswag import render_example, iterate_examples
+import inspect
 
 # run the training loop
 from torch.distributed import init_process_group, destroy_process_group
@@ -51,8 +52,8 @@ if torch.cuda.is_available():
     torch.cuda.manual_seed(1337)
     
 # Batch Accumulation
-total_batch_size = 524288 // 8
-B = 8
+total_batch_size = 524288
+B = 64
 T = 1024
 # print(f"The ddp world size is {ddp_world_size}")
 gradient_accumulation_steps = total_batch_size // (B * T * ddp_world_size)
@@ -93,8 +94,8 @@ raw_model = model.module if ddp else model
 # lr schedular
 max_lr = 6e-4
 min_lr = max_lr * 0.1
-warmup_steps = 120
-max_steps = 3528
+warmup_steps = 415
+max_steps = 15285
 
 def lr_schedular(it):
     
@@ -124,7 +125,12 @@ for name , param in raw_model.named_parameters():
 
 modified_params_with_decay = [{"params" : decay , "weight_decay": 0.1}, {"params": decay_not, "weight_decay": 0.0}]
 
-optimiser = torch.optim.AdamW(modified_params_with_decay, lr=max_lr , betas=(0.9,0.95), eps=1e-8)
+fused_available = 'fused' in inspect.signature(torch.optim.AdamW).parameters
+use_fused = fused_available and device_type == "cuda"
+if master_process:
+    print(f"using fused AdamW: {use_fused}")
+        
+optimiser = torch.optim.AdamW(modified_params_with_decay, lr=max_lr , betas=(0.9,0.95), eps=1e-8, fused=use_fused)
 
 
 log_dir = "log"
@@ -160,7 +166,7 @@ for step in range(max_steps):
     last_step = (step == max_steps - 1)
     
     # Validation loss logging
-    if step % 25 == 0 or last_step :
+    if (step % 250 == 0 or last_step) :
         model.eval()
         val_data_loader.reset()
         with torch.no_grad():
@@ -170,7 +176,7 @@ for step in range(max_steps):
                 x , y = val_data_loader.next_batch()
                 x = x.to(device)
                 y = y.to(device)
-                with torch.autocast(device_type = device_type ,dtype=torch.float32):
+                with torch.autocast(device_type = device_type ,dtype=torch.bfloat16):
                     logits, loss = model(x,y)
                 loss = loss/val_loss_steps
                 val_loss_accum += loss.detach()
@@ -184,7 +190,7 @@ for step in range(max_steps):
                 f.write(f"{step} val {val_loss_accum.item():.4f}\n")
                 
     
-    if (step % 25 == 0 or last_step):
+    if (step % 250 == 0 or last_step):
         num_correct_norm = 0
         num_total = 0
         for i, example in enumerate(iterate_examples("val")):
@@ -228,7 +234,7 @@ for step in range(max_steps):
         if ddp:
             model.require_backward_grad_sync = (micro_step == gradient_accumulation_steps-1)
         # mixed precision
-        with torch.autocast(device_type = device_type ,dtype=torch.float32):
+        with torch.autocast(device_type = device_type ,dtype=torch.bfloat16):
             logits, loss = model(x,y)
             loss = loss/gradient_accumulation_steps
             loss_accumulation += loss.detach()
@@ -305,4 +311,4 @@ for i in range(num_return_sentences):
 # export NCCL_IB_DISABLE=1
 # export NCCL_P2P_DISABLE=1
 # export NCCL_SHM_DISABLE=1
-# torchrun --standalone --nproc_per_node=2 -m train.train_DDP_split
+# torchrun --standalone --nproc_per_node=8 -m train.train_DDP_split

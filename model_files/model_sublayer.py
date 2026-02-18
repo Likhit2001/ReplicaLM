@@ -36,7 +36,7 @@ class CausalSelfAttention(nn.Module):
         # y = att @ v 
         
         # thee above 4 lines is removed to have the flash_attention layers
-        y = F.scaled_dot_product_attention(q,k,v)
+        y = F.scaled_dot_product_attention(q,k,v, is_causal=True)
         
         # the above y is in form my B, nh, T, dim
         
